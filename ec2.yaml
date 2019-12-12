@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: EC2 instance host beacon site for on prem PRTG monitoring
+Parameters: 
+  VPCId:
+    Type: String
+    Description: VPC ID
+  ServerName:
+    Type: String
+    Description: Server name
+  SecurityGroupName:
+    Type: String
+    Description: SecurityGroup name
+  VPCSubnetId:
+    Type: String
+    Description: Subnet ID in the format of subnet-c1xxxxxx
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/your/path/amz2-hvm/latest'
+Resources: 
+  webServerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Ref SecurityGroupName
+      GroupDescription: Security Group for HTTP access
+      VpcId: 
+        Ref: VPCId
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 10.0.0.0/8
+      - IpProtocol: icmp
+        FromPort: 8
+        ToPort: -1
+        CidrIp: 10.0.0.0/8
+      Tags:
+        - Key: Name
+          Value: !Ref SecurityGroupName
+        - Key: Usage
+          Value: DirectConnectMonitor
+  WebServer:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: t3.nano
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "false"
+          DeviceIndex: "0"
+          GroupSet:
+            - !Ref webServerSG
+          SubnetId: !Ref VPCSubnetId  
+      UserData: 
+        "Fn::Base64":
+          !Sub |
+            #!/bin/bash -xe
+            yum update -y 
+            amazon-linux-extras install nginx1.12 -y
+            systemctl start nginx
+            systemctl enable nginx
+      Tags:
+        - Key: Name
+          Value: !Ref ServerName
+        - Key: owner
+          Value: IT
+        - Key: Usage
+          Value: DirectConnectMonitor
+        - Key: Updated
+          Value: Dec2019
+Outputs:
+  ImageID:
+    Description: Web Server Image ID
+    Value: !Ref LatestAmiId
+  EC2IP:
+    Description: Web Server IP Address
+    Value: !GetAtt WebServer.PrivateIp

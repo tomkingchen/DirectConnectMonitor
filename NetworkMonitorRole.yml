@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Network Monitor CrossAccount Role'
+
+Parameters:
+  roleName:
+    Type: String
+    Default: NetworkMonitorCrossAccountRole
+  parentAWSAccountID:
+    Type: String
+    Default: '123456789012'
+Resources:
+  NetworkMonitorCrossAccountRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Ref roleName
+      Path: /
+      Policies:
+        - PolicyName: NetworkMonitorCrossAccountPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ec2:Describe*"
+                  - "ec2:CreateSecurityGroup"
+                  - "ec2:CreateNetworkInterface"
+                  - "ec2:CreateTags"
+                  - "ec2:CreateVolume"
+                  - "ec2:AttachNetworkInterface"
+                  - "ec2:AttachVolume"
+                  - "ec2:RunInstances"
+                  - "ec2:AuthorizeSecurityGroupIngress"
+                  - "ec2:AuthorizeSecurityGroupEgress"
+                  - "ec2:RevokeSecurityGroupEgress"
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "ec2:TerminateInstances"
+                  - "ec2:DeleteSecurityGroup"
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    ec2:ResourceTag/Usage: "DirectConnectMonitor"
+              - Effect: "Allow"
+                Action:
+                  - "cloudformation:Describe*"
+                  - "cloudformation:CreateStack"
+                  - "cloudformation:UpdateStack"
+                  - "cloudformation:DeleteStack"
+                Resource: !Sub arn:aws:cloudformation:*:${AWS::AccountId}:stack/directconnect-beacon-instance-*/*
+              - Effect: "Allow"
+                Action:
+                  - "ssm:GetParameters"
+                Resource: 
+                  - !Sub 'arn:aws:ssm:*:${AWS::AccountId}:parameter/GoldAMI/*' 
+              - Effect: "Allow"
+                Action:
+                  - "directconnect:AcceptDirectConnectGatewayAssociationProposal"
+                Resource: "*"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${parentAWSAccountID}:root'
+            Action:
+              - 'sts:AssumeRole'
